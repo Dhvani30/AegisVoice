@@ -1,0 +1,28 @@
+/* Wipe out default template variables and body limits */
+:root {
+  background: transparent !important;
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Reset #root to expand full screen and accept absolute toast positioning */
+#root {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  display: block !important;
+  box-sizing: border-box;
+}
