@@ -1,22 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 function App() {
   const [alerts, setAlerts] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
+  const wsRef = useRef(null);
+  const reconnectTimerRef = useRef(null);
 
   useEffect(() => {
-    let ws = null;
-    let reconnectTimer = null;
-
-    // 1. Define the removal logic inside the hook for the auto-dismiss
-    const removeAlert = (id) => {
-      setAlerts(prev => prev.filter(alert => alert.id !== id));
-    };
-
     const connectWebSocket = () => {
+      // Prevent duplicate connections
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        return;
+      }
+
       console.log('Attempting WebSocket connection...');
-      ws = new WebSocket('ws://127.0.0.1:8765');
+      const ws = new WebSocket('ws://127.0.0.1:8765');
+      wsRef.current = ws;
       
       ws.onopen = () => {
         console.log('WebSocket connected successfully!');
@@ -35,11 +35,16 @@ function App() {
               createdAt: Date.now()
             };
             
-            setAlerts(prev => [newAlert, ...prev]);
+            // Deduplicate: check if alert with same ID already exists
+            setAlerts(prev => {
+              const exists = prev.some(a => a.id === newAlert.id);
+              if (exists) return prev;
+              return [newAlert, ...prev];
+            });
             
             // Auto-remove after 30 seconds
             setTimeout(() => {
-              removeAlert(newAlert.id); // Works perfectly without dependency warnings!
+              setAlerts(prev => prev.filter(alert => alert.id !== newAlert.id));
             }, 30000);
           }
         } catch (e) { 
@@ -54,19 +59,27 @@ function App() {
       ws.onclose = () => {
         console.log('WebSocket disconnected');
         setWsConnected(false);
-        reconnectTimer = setTimeout(connectWebSocket, 2000);
+        
+        // Only reconnect if this is still the active connection
+        if (wsRef.current === ws) {
+          reconnectTimerRef.current = setTimeout(connectWebSocket, 2000);
+        }
       };
     };
 
     connectWebSocket();
 
     return () => {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      if (ws) ws.close();
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      if (wsRef.current) {
+        wsRef.current.close();
+        wsRef.current = null;
+      }
     };
-  }, []); // Empty dependency array is safe and stable
+  }, []);
 
-  // 2. Keep this copy out here for the JSX onClose callback button click
   const removeAlert = (id) => {
     setAlerts(prev => prev.filter(alert => alert.id !== id));
   };
@@ -101,7 +114,6 @@ function App() {
   );
 }
 
-// Separate component for individual alert cards
 function AlertCard({ alert, onClose, index }) {
   return (
     <div className="alert-card" style={{ '--delay': `${index * 0.1}s` }}>
