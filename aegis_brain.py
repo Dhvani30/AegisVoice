@@ -8,7 +8,7 @@ class AegisBrain:
         self.model_name = model_name
         self.ollama_url = "http://localhost:11434/api/generate"
         
-        # Level 1; immmediate triggers (Reflex)
+        # Level 1: immediate triggers (Reflex)
         self.triggers = [
             r"\bsocial\s+security\b", r"\bbank\s+account\b", r"\bwire\s+transfer\b",
             r"\bgift\s+card\b", r"\bbitcoin\b", r"\bcryptocurrency\b", r"\bsuspend\b",
@@ -17,37 +17,40 @@ class AegisBrain:
         self.compiled_triggers = [re.compile(t, re.IGNORECASE) for t in self.triggers]
         logging.info(f"Aegis Brain initialized with {len(self.triggers)} Tier-1 triggers and {model_name} Tier-2 LLM.")
 
-    def _tier1_regex_scan(self, text):
-        # scans for hard scam keywords. Adds 25 points per match.
+    def _tier1_regex_scan(self, context_text):
         score = 0
         matched_terms = []
         for pattern in self.compiled_triggers:
-            if pattern.search(text):
+            if pattern.search(context_text):
                 score += 25
                 clean_term = pattern.pattern.replace(r"\b", "").replace(r"\s+", " ").strip()
                 matched_terms.append(clean_term)
         return min(score, 50), matched_terms
 
-    def _tier2_llm_analysis(self, text):
-        # sends context to local LLM to detect psychological coercion
-        # UPGRADED PROMPT: telling the AI to be highly suspicious and aggressive
-        prompt = f"""You are an expert fraud detection AI analyzing a live call transcript. 
-A regex scanner has already checked for hard keywords (like "SSN" or "gift card"). 
-Your job is to analyze the CONTEXT and PSYCHOLOGY to detect social engineering.
+    def _tier2_llm_analysis(self, context_text):
+        # Prompt for llm
+        prompt = f"""You are a strict classifier. Look at the examples, then classify the final text.
 
-Look for:
-- Artificial urgency (e.g., "must act right now", "offer expires in 10 minutes").
-- Intimidation (e.g., threats of arrest, account closure, or legal action).
-- Isolation (e.g., "don't tell anyone", "keep this secret").
-- Requests for remote access, screen sharing, or downloading apps.
+Examples:
+Text: "I actually prefer white pieces."
+Output: {{"category": "SAFE_CHAT", "risk_score": 0, "reason": "Talking about chess."}}
 
-Note: Legitimate businesses sometimes ask for account numbers or verification. Only assign a high score if the caller's tone is coercive, threatening, or highly suspicious.
+Text: "I have a chest."
+Output: {{"category": "SAFE_CHAT", "risk_score": 0, "reason": "Talking about furniture or gaming."}}
 
-Transcript: "{text}"
+Text: "He's got a lot of close friends."
+Output: {{"category": "SAFE_CHAT", "risk_score": 0, "reason": "Casual conversation."}}
 
-Respond with a JSON object containing:
-- "risk_score": integer 0-100. (0-30: Safe/Routine, 31-70: Suspicious, 71-100: Definite Scam).
-- "reason": A brief, 1-sentence explanation of the psychological threat."""
+Text: "Send me your social security number right now."
+Output: {{"category": "FINANCIAL_SCAM", "risk_score": 100, "reason": "Demanding SSN."}}
+
+Text: "Wire the money to this account or you will be arrested."
+Output: {{"category": "FINANCIAL_SCAM", "risk_score": 100, "reason": "Demanding wire transfer with legal threats."}}
+
+Now classify this text:
+Text: "{context_text}"
+Output:
+"""
 
         try:
             payload = {
@@ -56,7 +59,7 @@ Respond with a JSON object containing:
                 "stream": False,
                 "format": "json" 
             }
-            response = requests.post(self.ollama_url, json=payload, timeout=10)
+            response = requests.post(self.ollama_url, json=payload, timeout=30) 
             if response.status_code == 200:
                 result = response.json()
                 llm_text = result.get("response", "{}")
@@ -68,24 +71,30 @@ Respond with a JSON object containing:
         return 0, "LLM analysis failed"
 
     def evaluate(self, context_text):
-        """Runs the full hybrid pipeline and returns the final verdict."""
         if not context_text.strip():
             return {"risk_score": 0, "reason": "No audio detected", "tier1_matches": []}
 
-        # Run level 1 (Reflex)
         t1_score, t1_matches = self._tier1_regex_scan(context_text)
-        
-        # Run level 2 (Brain)
         t2_score, t2_reason = self._tier2_llm_analysis(context_text)
         
-        # Combine Scores (take MAX of the two)
+        sanity_keywords = [
+            'bank', 'money', 'wire', 'ssn', 'social', 'arrest', 'police', 
+            'address', 'account', 'card', 'transfer', 'law', 'enforcement', 
+            'drug', 'trafficking', 'laundering', 'irs'
+        ]
+        text_lower = context_text.lower()
+        has_sanity_keyword = any(k in text_lower for k in sanity_keywords)
+
+        if t2_score >= 80 and not has_sanity_keyword:
+            logging.warning(f"----- AI HALLUCINATION BLOCKED! AI Score: {t2_score} | Text: {context_text}")
+            t2_score = 0 
+
         final_score = max(t1_score, t2_score) 
         
-        # if both flagged it, give it a bonus to guarantee it crosses the threshold
         if t1_score > 0 and t2_score > 20:
             final_score = 100 
 
-        # 4. Formulate final reason
+        # final reason
         if t1_matches:
             final_reason = f"Keywords: {', '.join(t1_matches)}. AI: {t2_reason}"
         else:

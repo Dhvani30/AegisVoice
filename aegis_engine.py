@@ -26,10 +26,10 @@ class AegisAudioEngine:
         # parameters
         self.sample_rate = 16000
         self.frame_duration_ms = 30  # VAD requires 10, 20, or 30ms frames
-        self.chunk_duration = 3.0    # We process 3 seconds of audio at a time for Whisper
+        self.chunk_duration = 3.0    # process 3 seconds of audio at a time
         
         # sliding context buffer (last 5 transcribed sentences)
-        self.context_buffer = collections.deque(maxlen=5)
+        self.context_buffer = collections.deque(maxlen=2)
         # initialize brain
         self.brain = AegisBrain()
         
@@ -40,7 +40,6 @@ class AegisAudioEngine:
         """Fixes the API call to correctly capture desktop audio on Windows."""
         try:
             speaker = sc.default_speaker()
-            # fetch the loopback-capable input matching your active speaker's ID/name
             self.loopback = sc.get_microphone(id=str(speaker.name), include_loopback=True)
             logging.info(f"Successfully hooked into system audio loopback: {speaker.name}")
             
@@ -53,10 +52,8 @@ class AegisAudioEngine:
 
     def _has_speech(self, audio_chunk):
         """Checks if the 3-second audio chunk actually contains human speech."""
-        # Convert float32 audio to 16-bit PCM (required by WebRTC VAD)
         pcm_audio = (audio_chunk * 32767).astype(np.int16).tobytes()
         
-        # Break into 30ms frames for VAD
         frame_size = int(self.sample_rate * (self.frame_duration_ms / 1000.0))
         speech_frames = 0
         
@@ -66,12 +63,11 @@ class AegisAudioEngine:
                 if self.vad.is_speech(frame, self.sample_rate):
                     speech_frames += 1
                     
-        # If at least 30% of the frames have speech, process it
         return speech_frames > (len(pcm_audio) / (frame_size * 2)) * 0.3
 
     def process_audio(self, audio_data):
         """Transcribes audio and updates the sliding context buffer."""
-        # PRODUCTION WHISPER SETTINGS:
+        # settings:
         # beam_size=5: Better accuracy than 1
         # language="en": Forces English, stops it from guessing French/Thai.
         # condition_on_previous_text=False: Stops hallucination cascades.
@@ -116,7 +112,7 @@ class AegisAudioEngine:
                     if len(audio_data.shape) > 1:
                         audio_data = np.mean(audio_data, axis=1)
 
-                    # VAD Check: Skip if it's just silence or background hum
+                    # skip if just silence or background hum
                     if not self._has_speech(audio_data):
                         continue 
 
