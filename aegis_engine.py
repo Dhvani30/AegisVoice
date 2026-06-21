@@ -6,7 +6,7 @@ import time
 import collections
 import logging
 import warnings
-import warnings
+from aegis_brain import AegisBrain
 
 # ignore warnings (garbage text)
 warnings.filterwarnings("ignore", message="data discontinuity in recording")
@@ -30,6 +30,8 @@ class AegisAudioEngine:
         
         # sliding context buffer (last 5 transcribed sentences)
         self.context_buffer = collections.deque(maxlen=5)
+        # initialize brain
+        self.brain = AegisBrain()
         
         # get OS loopback
         self._setup_loopback()
@@ -88,6 +90,15 @@ class AegisAudioEngine:
             full_context = " ".join(self.context_buffer)
             logging.info(f"NEW TRANSCRIPT: {text}")
             logging.info(f"CURRENT CONTEXT: {full_context}")
+            # evlauate hybrid brain
+            verdict = self.brain.evaluate(full_context)
+            risk_score = verdict['risk_score']
+            reason = verdict['reason']
+            
+            logging.info(f"!!!!!RISK SCORE: {risk_score}/100 | REASON: {reason}")
+            
+            if risk_score >= 50:
+                logging.critical("!!!!!!!HIGH RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
             return full_context
         return " ".join(self.context_buffer)
 
