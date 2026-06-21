@@ -7,6 +7,7 @@ import collections
 import logging
 import warnings
 from aegis_brain import AegisBrain
+from aegis_bridge import AegisBridge
 
 # ignore warnings (garbage text)
 warnings.filterwarnings("ignore", message="data discontinuity in recording")
@@ -32,7 +33,8 @@ class AegisAudioEngine:
         self.context_buffer = collections.deque(maxlen=2)
         # initialize brain
         self.brain = AegisBrain()
-        
+        self.bridge = AegisBridge()
+        self.bridge.start_server()
         # get OS loopback
         self._setup_loopback()
 
@@ -87,7 +89,7 @@ class AegisAudioEngine:
             logging.info(f"NEW TRANSCRIPT: {text}")
             logging.info(f"CURRENT CONTEXT: {full_context}")
             # evlauate hybrid brain
-            verdict = self.brain.evaluate(full_context)
+            verdict = self.brain.evaluate(full_context,text)
             risk_score = verdict['risk_score']
             reason = verdict['reason']
             
@@ -95,6 +97,13 @@ class AegisAudioEngine:
             
             if risk_score >= 50:
                 logging.critical("!!!!!!!HIGH RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
+                alert_payload={
+                    "type":"SCAM_ALERT",
+                    "risk_score": risk_score,
+                    "reason": reason,
+                    "timestamp": time.time(),
+                }
+                self.bridge.send_alert(alert_payload)
             return full_context
         return " ".join(self.context_buffer)
 
