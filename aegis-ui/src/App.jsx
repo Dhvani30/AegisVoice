@@ -5,13 +5,14 @@ function App() {
   const [alerts, setAlerts] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
 
-  const removeAlert = (id) => {
-    setAlerts(prev => prev.filter(alert => alert.id !== id));
-  };
-
   useEffect(() => {
     let ws = null;
     let reconnectTimer = null;
+
+    // 1. Define the removal logic inside the hook for the auto-dismiss
+    const removeAlert = (id) => {
+      setAlerts(prev => prev.filter(alert => alert.id !== id));
+    };
 
     const connectWebSocket = () => {
       console.log('Attempting WebSocket connection...');
@@ -29,7 +30,7 @@ function App() {
           
           if (data.type === 'SCAM_ALERT') {
             const newAlert = {
-              id: Date.now(),
+              id: data.id || (Date.now() + Math.random()),
               ...data,
               createdAt: Date.now()
             };
@@ -38,7 +39,7 @@ function App() {
             
             // Auto-remove after 30 seconds
             setTimeout(() => {
-              removeAlert(newAlert.id);
+              removeAlert(newAlert.id); // Works perfectly without dependency warnings!
             }, 30000);
           }
         } catch (e) { 
@@ -63,7 +64,12 @@ function App() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
       if (ws) ws.close();
     };
-  }, []);
+  }, []); // Empty dependency array is safe and stable
+
+  // 2. Keep this copy out here for the JSX onClose callback button click
+  const removeAlert = (id) => {
+    setAlerts(prev => prev.filter(alert => alert.id !== id));
+  };
 
   if (!wsConnected) {
     return (
