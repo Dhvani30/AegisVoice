@@ -1,6 +1,46 @@
 import { useState, useEffect, useRef } from 'react';
 import './App.css';
 
+// Helper to determine theme, badge, and icon based on risk score
+const getAlertConfig = (score) => {
+  if (score >= 50) {
+    return {
+      theme: 'red',
+      badge: 'HIGH RISK SCAM DETECTED',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+          <line x1="12" y1="9" x2="12" y2="13" />
+          <line x1="12" y1="17" x2="12.01" y2="17" />
+        </svg>
+      )
+    };
+  } else if (score >= 26) {
+    return {
+      theme: 'orange',
+      badge: 'MEDIUM RISK WARNING',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="12" y1="8" x2="12" y2="12" />
+          <line x1="12" y1="16" x2="12.01" y2="16" />
+        </svg>
+      )
+    };
+  } else {
+    return {
+      theme: 'yellow',
+      badge: 'LOW RISK ADVISORY',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+      )
+    };
+  }
+};
+
 function App() {
   const [alerts, setAlerts] = useState([]);
   const [wsConnected, setWsConnected] = useState(false);
@@ -96,9 +136,14 @@ function App() {
     );
   }
 
+  // Calculate the highest risk score to determine the screen border color
+  const maxRiskScore = alerts.length > 0 ? Math.max(...alerts.map(a => a.risk_score)) : 0;
+  const borderTheme = maxRiskScore >= 50 ? 'red' : maxRiskScore >= 26 ? 'orange' : maxRiskScore >= 10 ? 'yellow' : '';
+
   return (
     <div className="overlay-container">
-      {alerts.length > 0 && <div className="pulsing-border" />}
+      {/* Apply dynamic theme class to pulsing border */}
+      {alerts.length > 0 && <div className={`pulsing-border theme-${borderTheme}`} />}
       
       <div className="alerts-container">
         {alerts.map((alert, index) => (
@@ -115,19 +160,18 @@ function App() {
 }
 
 function AlertCard({ alert, onClose, index }) {
+  const config = getAlertConfig(alert.risk_score);
+
   return (
-    <div className="alert-card" style={{ '--delay': `${index * 0.1}s` }}>
+    // Apply dynamic theme class to the card
+    <div className={`alert-card theme-${config.theme}`} style={{ '--delay': `${index * 0.1}s` }}>
       <div className="alert-header">
         <div className="alert-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
+          {config.icon}
         </div>
         <div className="alert-title-section">
           <h2>AEGIS VOICE</h2>
-          <span className="alert-badge">HIGH RISK SCAM DETECTED</span>
+          <span className="alert-badge">{config.badge}</span>
         </div>
         <button className="close-btn" onClick={onClose} title="Dismiss alert">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">

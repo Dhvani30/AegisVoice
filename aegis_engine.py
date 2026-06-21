@@ -95,10 +95,16 @@ class AegisAudioEngine:
             
             logging.info(f"!!!!!RISK SCORE: {risk_score}/100 | REASON: {reason}")
             
-            if risk_score >= 50:
-                logging.critical("!!!!!!!HIGH RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
+            if risk_score >= 10:
+                if risk_score >= 50:
+                    logging.critical("!!!!!!!HIGH RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
+                elif risk_score >= 26:
+                    logging.warning("!!!!!!MEDIUM RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
+                else:
+                    logging.info("!!!!!LOW RISK DETECTED! TRIGGERING ALERT PAYLOAD...")
+                
                 alert_payload={
-                    "type":"SCAM_ALERT",
+                    "type": "SCAM_ALERT",
                     "risk_score": risk_score,
                     "reason": reason,
                     "timestamp": time.time(),
