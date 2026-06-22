@@ -112,8 +112,7 @@ Watch as the system transcribes locally and triggers the Yellow ➔ Orange ➔ R
 
 ## Submission Links
 * 📂 GitHub Repository: https://github.com/Dhvani30/AegisVoice
-* 🎥 Demo Video (2-5 Mins): [Insert YouTube/Loom Link Here]
-* 📊 Presentation Deck: [Insert PDF/Canva Link Here]
+* 🎥 Demo Video (2-5 Mins): https://drive.google.com/drive/folders/1Bp6uH_ZvXk_B8aTXovwYk3zGM5ZGP7CT?usp=sharing
 
 
 ## 🔮 Future Scope & Scalability
